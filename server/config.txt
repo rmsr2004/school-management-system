@@ -1,0 +1,3 @@
+jorge;1234;administrador
+manuel;1234;aluno
+joana;1234;professor
