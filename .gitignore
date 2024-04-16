@@ -4,3 +4,6 @@
 
 # Arquivos executáveis
 executable
+
+# Pasta vscode
+.vscode
