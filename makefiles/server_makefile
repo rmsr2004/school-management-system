@@ -1,7 +1,7 @@
 CC      = gcc
 OBJS    = admin/admin.o functions/functions.o user/user.o server/server.o client/client.o users_list/users_list.o
 PROG    = server/server
-FLAGS   = -Wall -Wextra -g
+FLAGS   = -Wall -Wextra
 
 all: ${PROG}
 

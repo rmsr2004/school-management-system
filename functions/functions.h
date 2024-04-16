@@ -28,7 +28,7 @@ users_node* load_users_data();
  * @param connection_type "UDP" or "TCP"
  * @return 1 if success, 0 otherwise
 */
-int verify_login(struct_user* user, char* connection_type);
+int verify_login(struct_user user, char* connection_type);
 /**
  * Invoke an error on system.
  * @param Message to describe the error.

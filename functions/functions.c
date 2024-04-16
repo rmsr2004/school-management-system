@@ -21,7 +21,6 @@ users_node* load_users_data(){
     if(f == NULL)
         error("Erro a abrir o ficheiro de configuração!");
     
-    
     struct_user user;
 
     char line[100];
@@ -40,47 +39,25 @@ users_node* load_users_data(){
     return list;
 }
 
-int verify_login(struct_user* user, char* connection_type){
-    FILE *f = fopen(config_file, "r");
+int verify_login(struct_user user, char* connection_type){
+    users_node* user_node = search_user_from_list(users_list, user.username);
+    if(user_node == NULL)
+        return 0;
 
-    if(f == NULL)
-        error("Erro a abrir o ficheiro de configuração!");
-
-    char line[100];
-    char f_username[10], f_password[10], type[20];
-
-    while(fgets(line, MAX_FILE_LEN-1, f) != NULL){
-        strcpy(f_username, strtok(line, ";"));
-        strcpy(f_password,  strtok(NULL, ";"));
-        strcpy(type, strtok(NULL, ";"));
-
-        remove_line_break(type);
-
-        /*
-        *   É login de um admin
-        */
-        if(strcmp(connection_type, "UDP") == 0){
-            if(strcmp(f_username, user->username) == 0 && strcmp(f_password, user->password) == 0 && 
-               strcmp(type, "administrador") == 0){
-
-                if(fclose(f))
-                    error("Erro a fechar o ficheiro de configuração!");
-                strcpy(user->type, "administrador"); 
-                return 1;
-            }
-        } else{
-            if(strcmp(f_username, user->username) == 0 && strcmp(f_password, user->password) == 0 && 
-               strcmp(type, "administrador") != 0){
-                
-                if(fclose(f))
-                    error("Erro a fechar o ficheiro de configuração!");
-                strcpy(user->type, "administrador"); 
-                return 1;
-            }
+    /*
+    *   É login de um admin
+    */
+    if(strcmp(connection_type, "UDP") == 0){
+        if(strcmp(user_node->user.type, "administrador") == 0){
+            strcpy(user.type, "administrador"); 
+            return 1;
+        }
+    } else{
+        if(strcmp(user_node->user.type, "administrador") != 0){ 
+            strcpy(user.type, "administrador"); 
+            return 1;
         }
     }
-    if(fclose(f))
-        error("Erro a fechar o ficheiro de configuração!");
     return 0;
 }
 

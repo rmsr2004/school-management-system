@@ -1,5 +1,5 @@
 CC      = gcc
-OBJS    = functions/functions.o client/tcp_client.o
+OBJS    = functions/functions.o client/tcp_client.o users_list/users_list.o
 PROG    = client/client
 FLAGS   = -Wall -Wextra
 
@@ -16,3 +16,6 @@ ${PROG}:	${OBJS}
 
 functions/functions.o:	functions/functions.c
 functions/functions.c:	functions/functions.h
+
+users_list/users_list.o:	users_list/users_list.c
+users_list/users_list.c:	users_list/users_list.h

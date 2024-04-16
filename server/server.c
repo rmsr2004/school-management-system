@@ -34,7 +34,7 @@ void handle_udp_connection(int udp_socket);
 * @return If login is correct returns the user received,
 *         otherwise returns null.
 */
-struct_user* verify_login_command(char* input, char* message);
+struct_user verify_login_command(char* input, char* message);
 
 int main(int argc, char *argv[]){
     /* Check if all arguments have been given */
@@ -104,7 +104,6 @@ int main(int argc, char *argv[]){
     waitpid(tcp_pid, NULL, 0);
     waitpid(udp_pid, NULL, 0);
 
-    
     close(tcp_socket);
     close(udp_socket);
     return 0;
@@ -131,8 +130,8 @@ void handle_tcp_connection(int tcp_socket){
         char* message = (char*) malloc(BUFFER_LEN * sizeof(char));
 
         /* Struct with info from user */
-        struct_user* user = verify_login_command(client_buffer, message);
-        if(user != NULL){
+        struct_user user = verify_login_command(client_buffer, message);
+        if(strcmp(user.username, "a") != 0){
             if(verify_login(user, "TCP")){
                 strcpy(message, "OK");
                 write(client_id, message, strlen(message));
@@ -208,8 +207,8 @@ void handle_udp_connection(int udp_socket){
         error("Erro a alocar memória!\n");
 
     /* Struct with info from user */
-    struct_user* user = verify_login_command(admin_buffer, message);
-    if(user != NULL){
+    struct_user user = verify_login_command(admin_buffer, message);
+    if(strcmp(user.username, "a") != 0){
         if(verify_login(user, "UDP")){
             strcpy(message, "OK\n");
             sendto(udp_socket, message, strlen(message), 0, (struct sockaddr *) &admin, udp_socket_len);
@@ -257,33 +256,37 @@ void handle_udp_connection(int udp_socket){
     return;
 }
 
-struct_user* verify_login_command(char* input, char* message){
-    struct_user* user = (struct_user*) malloc(sizeof(struct_user));
-    if(user == NULL)
-        error("Erro a alocar memória!\n"); 
+struct_user verify_login_command(char* input, char* message){
+    struct_user user_null = {
+        .username = "a",
+        .password = "a",
+        .type = "a"
+    };
+
+    struct_user user;
     
     char command[10];
     char* token = strtok(input, " ");
 
     if(strcmp(token, "LOGIN") != 0)
-        return NULL;
+        return user_null;
 
     strcpy(command, token); // command -> "LOGIN"
 
     token = strtok(NULL, " ");
     if(token == NULL){
         strcpy(message, "LOGIN <username> <password>");
-        return NULL;
+        return user_null;
     }
-    strcpy(user->username, token);
+    strcpy(user.username, token);
     
     token = strtok(NULL, " ");
     if(token == NULL){
         strcpy(message, "LOGIN <username> <password>");
-        return NULL;
+        return user_null;
     }
-    strcpy(user->password, token);
-    remove_line_break(user->password);
+    strcpy(user.password, token);
+    remove_line_break(user.password);
 
     return user;
 }
