@@ -70,7 +70,7 @@ int main(int argc, char* argv[]){
         buffer[nread] = '\0';
         printf("%s\n", buffer);
 
-        if(strcmp(buffer, "REJECTED\n") == 0 || strcmp(buffer, "LOGIN <username> <password>") == 0)
+        if(strcmp(buffer, "REJECTED") == 0 || strcmp(buffer, "LOGIN <username> <password>") == 0)
             exit(-1);
     }
     close(fd);

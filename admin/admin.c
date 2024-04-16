@@ -86,7 +86,7 @@ int verify_admin_command(char* input, char* message){
         return -1;
     }
 }
-
+/*
 void add_user(struct_user new_user){
     if(search_username(new_user.username)){
         printf("Username '%s' já registado!\n", new_user.username);
@@ -94,7 +94,7 @@ void add_user(struct_user new_user){
     }
 
     char type[50];
-    strcpy(type, new_user.type);
+    strcpy(type, new_user->type);
 
     if(strcmp(type, "administrador") == 0 || strcmp(type, "aluno") == 0 || strcmp(type, "professor") == 0 ){
         FILE *f = fopen(config_file, "a");

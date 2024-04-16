@@ -1,6 +1,6 @@
 #!/bin/bash
 clear
-make -f makefiles/server_makefile
+make -f makefiles/server_makefile all
 
 # Limpar arquivos de objeto
 make -f makefiles/server_makefile clean

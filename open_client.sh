@@ -2,7 +2,7 @@
 
 clear
 # Compilar o servidor
-make -f makefiles/client_makefile
+make -f makefiles/client_makefile all
 
 # Limpar arquivos de objeto
 make -f makefiles/client_makefile clean
