@@ -1,7 +1,0 @@
-{
-    "files.associations": {
-        "stdarg.h": "c",
-        "users_list.h": "c",
-        "classes_list.h": "c"
-    }
-}
