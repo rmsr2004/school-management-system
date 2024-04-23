@@ -13,6 +13,9 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <ctype.h>
+#include <fcntl.h>
+#include <sys/wait.h>
+#include <signal.h>
 
 #define BUF_LEN    1024
 #define INPUT_SIZE 100
@@ -45,7 +48,7 @@ int main(int argc, char* argv[]){
     // variavel para guardar mensagem recebida do servidor 
     char buffer[BUF_LEN];
     socklen_t slen = sizeof(server);
-
+    
     while(1){
         if(fgets(input, INPUT_SIZE-1, stdin) == NULL)
             error("Erro a ler do stdin");
@@ -61,18 +64,32 @@ int main(int argc, char* argv[]){
         
         buffer[recv_len] = '\0';
 
+        if(strcmp(buffer, "QUIT_SERVER\n") == 0){
+            printf("[SERVER] Server closing in 60 seconds!\n");
+            for(int i = 1; i <= 2; i++){
+                sleep(20);
+                printf("[SERVER] Server closing in %d seconds!\n", 60 - i*20);
+            }
+            sleep(10);
+            printf("[SERVER] Server closing in 10 seconds!\n");
+            for(int i = 1; i < 10; i++){
+                sleep(1);
+                printf("[SERVER] Server closing in %d seconds!\n", 10 - i);
+            }
+            sleep(5);
+            kill(getppid(), SIGINT);
+            exit(0);
+        }
+
         // imprimir resposta do servidor
         printf("%s", buffer);
 
         // Se a resposta for "SAIR", sai do loop e a sessão é fechada
         if(strcmp(buffer, "REJECTED") == 0)
             break;
-        
-        //fflush(stdout);
     }
 
     /* Deallocate the socket */
     close(s);
     return 0;
 }
-

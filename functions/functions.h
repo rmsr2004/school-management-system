@@ -2,34 +2,46 @@
 #define FUNCTIONS_H
 
 #include "../user/user.h"
-#include "../users_list/users_list.h"
+#include <sys/ipc.h>
 
-#define MAX_FILE_LEN 100
+#define BUFFER_LEN      1024
+#define INPUT_SIZE      100
+#define MAX_FILE_LEN    100
+#define MSQ_QUEUE_PATH  "/tmp"
 
 // Config file.
 extern char config_file[10];
-
-// Users list.
-extern users_node* users_list;
+// Message queue id.
+extern int mq_id;
+// Message queue key.
+extern key_t key;
+// Struct to store message queue message.
+typedef struct{
+    long priority;
+    int msg;
+} queue_message;
 
 /*
 * Defines config_file variable to use globaly.
 * @param filename File's filename.
 */
 void define_config_file(char* filename);
-/*
-* Load users data from file.
-* @return Users list.
-*/
-users_node* load_users_data();
 /**
  * Verify login.
  * @param user Struct containing user login information
  * @param connection_type "UDP" or "TCP"
  * @return 1 if success, 0 otherwise
 */
-int verify_login(struct_user user, char* connection_type);
-/**
+int verify_login(struct_user* user, char* connection_type);
+/*
+* Get time in format "HH:MM:SS".
+*/
+char* get_time();
+/*
+* Returns user from file if username exists.
+*/
+struct_user* get_user_from_file(char* username);
+/*
  * Invoke an error on system.
  * @param Message to describe the error.
 */
