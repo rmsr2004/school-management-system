@@ -1,5 +1,5 @@
 CC      = gcc
-OBJS    = admin/admin.o functions/functions.o user/user.o server/server.o client/client.o users_list/users_list.o
+OBJS    = admin/admin.o functions/functions.o user/user.o server/server.o client/client.o
 PROG    = server/server
 FLAGS   = -Wall -Wextra
 
@@ -22,9 +22,6 @@ functions/functions.c:	functions/functions.h
 
 user/user.o:	user/user.c
 user/user.c:	user/user.h
-
-users_list/users_list.o:	users_list/users_list.c
-users_list/users_list.c:	users_list/users_list.h
 
 client/client.o:	client/client.c
 client/client.c:	client/client.h

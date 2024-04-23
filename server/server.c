@@ -286,10 +286,10 @@ void handle_udp_connection(int udp_socket){
 
                 printf("UDP: %s\n", admin_buffer);
                 
-                int temp = verify_admin_command(admin_buffer, message);
-                if(temp == -1){
+                char** args = verify_admin_command(admin_buffer, message);
+                if(args == NULL){
                     sendto(udp_socket, message, strlen(message), 0, (struct sockaddr *) &admin, udp_socket_len);
-                } else if(temp == 0){
+                } else if(strcmp(args[0], "ERROR") == 0){
                     sendto(udp_socket, message, strlen(message), 0, (struct sockaddr *) &admin, udp_socket_len);
                 } else {
                     if(strcmp(message, "DEL\n") == 0){
@@ -299,6 +299,7 @@ void handle_udp_connection(int udp_socket){
                     } else if(strcmp(message,"ADD_USER\n") == 0){
                         strcpy(message, "From server: ADD_USER\n");
                         sendto(udp_socket, message, strlen(message), 0, (struct sockaddr *) &admin, udp_socket_len);
+                        printf("%s\n", add_user(args));
                         //POSTERIORMENTE CHAMA-SE A FUNÇÃO RESPONSÁVEL
                     } else if(strcmp(message, "LIST\n") == 0){
                         strcpy(message,"From server: LIST\n");

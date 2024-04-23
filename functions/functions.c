@@ -6,12 +6,14 @@
 #include <stdarg.h>
 #include <unistd.h>
 #include <time.h>
+#include <ctype.h>
 
-char config_file[10];
+char* config_file;
 int mq_id;
 key_t key;
 
 void define_config_file(char* filename){
+    config_file = (char*) malloc(50 * sizeof(char));
     strcpy(config_file, filename);
 }
 
@@ -54,7 +56,7 @@ char* get_time(){
 struct_user* get_user_from_file(char* username){
     FILE *f = fopen(config_file, "r");
     if(f == NULL){
-        error("fopen()");
+        error("fopen(): ");
     }
 
     struct_user* user = (struct_user*) malloc(sizeof(struct_user));
@@ -75,6 +77,26 @@ struct_user* get_user_from_file(char* username){
         }
     }
     return NULL;
+}
+
+int is_number(char *string){
+    for(size_t i = 0; i < strlen(string); i++)
+        if(string[i] < '0' || string[i] > '9')
+            return 0;
+    return 1;
+}
+void to_upper(char* string){
+    for(size_t i = 0; i < strlen(string); i++)
+        string[i] = toupper(string[i]);
+    return;
+}
+int verify_string(char* string){
+    for(size_t i = 0; i < strlen(string); i++){
+        if(string[i] >= 65 && string[i] <= 122)
+            continue;
+        return 0;
+    }
+    return 1;
 }
 
 void error(const char *format, ...){

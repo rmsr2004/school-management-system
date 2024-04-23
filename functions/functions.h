@@ -10,7 +10,7 @@
 #define MSQ_QUEUE_PATH  "/tmp"
 
 // Config file.
-extern char config_file[10];
+extern char* config_file;
 // Message queue id.
 extern int mq_id;
 // Message queue key.
@@ -41,6 +41,18 @@ char* get_time();
 * Returns user from file if username exists.
 */
 struct_user* get_user_from_file(char* username);
+/*
+* Verify if string has numbers.
+*/
+int is_number(char* string);
+/*
+* Convert string to caps.
+*/
+void to_upper(char* string);
+/*
+* Verify if string hasn´t numbers.
+*/
+int verify_string(char* string);
 /*
  * Invoke an error on system.
  * @param Message to describe the error.
