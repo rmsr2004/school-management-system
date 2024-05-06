@@ -4,22 +4,25 @@
 #include "../user/user.h"
 #include <sys/ipc.h>
 
-#define BUFFER_LEN      1024
-#define INPUT_SIZE      100
-#define MAX_FILE_LEN    100
-#define MSQ_QUEUE_PATH  "/tmp"
+#define BUFFER_LEN      200         // Buffer length.
+#define INPUT_SIZE      50          // Input size.
+#define MAX_FILE_LEN    20          // Max file length.
+#define MSQ_QUEUE_PATH  "/tmp"      // Message queue path.
+#define MAX_USERS       30          // Max users.
 
 // Config file.
 extern char* config_file;
 // Message queue id.
 extern int mq_id;
 // Message queue key.
-extern key_t key;
-// Struct to store message queue message.
+extern key_t key_msg;
+// Shared memory id.
+extern int shmid;
+
 typedef struct{
     long priority;
     int msg;
-} queue_message;
+} queue_message; // Struct to store message queue message.
 
 /*
 * Defines config_file variable to use globaly.
@@ -42,6 +45,10 @@ char* get_time();
 */
 struct_user* get_user_from_file(char* username);
 /*
+* Creates an array with arguments from user.
+*/
+char** create_args_array(int args_number);
+/*
 * Verify if string has numbers.
 */
 int is_number(char* string);
@@ -63,4 +70,4 @@ void error(const char *format, ...);
 */
 void remove_line_break(char* string);
 
-#endif
+#endif // FUNCTIONS_H

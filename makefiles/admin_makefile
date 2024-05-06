@@ -1,6 +1,6 @@
 CC      = gcc
-OBJS    = functions/functions.o admin/udp_admin.o
-PROG    = admin/admin
+OBJS    = functions/functions.o admin/udp_admin.o admin/admin.o
+PROG    = class_admin
 FLAGS   = -Wall -Wextra
 
 all: ${PROG}
@@ -16,3 +16,6 @@ ${PROG}:	${OBJS}
 
 functions/functions.o:	functions/functions.c
 functions/functions.c:	functions/functions.h
+
+admin/admin.o:	admin/admin.c
+admin/admin.c:	admin/admin.h

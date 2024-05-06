@@ -6,6 +6,7 @@
 // Rodrigo Miguel Santos Rodrigues - 2022233032
 // João Afonso dos Santos Simões   - 2022236316 
 #include "../functions/functions.h"
+#include "../admin/admin.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -16,9 +17,6 @@
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <signal.h>
-
-#define BUF_LEN    1024
-#define INPUT_SIZE 100
 
 int main(int argc, char* argv[]){
     if(argc != 3) error("Usage: %s <host> <port> \n", argv[0]);
@@ -46,7 +44,7 @@ int main(int argc, char* argv[]){
         error("Erro a alocar memória!");
 
     // variavel para guardar mensagem recebida do servidor 
-    char buffer[BUF_LEN];
+    char buffer[BUFFER_LEN];
     socklen_t slen = sizeof(server);
     
     while(1){
@@ -59,25 +57,13 @@ int main(int argc, char* argv[]){
             error("sendto()");
         
         // Receber resposta do servidor
-        if((recv_len = recvfrom(s, buffer, BUF_LEN, 0, (struct sockaddr *) &server, &slen)) == -1)
+        if((recv_len = recvfrom(s, buffer, BUFFER_LEN, 0, (struct sockaddr *) &server, &slen)) == -1)
 	        error("Erro no recvfrom");
         
         buffer[recv_len] = '\0';
 
         if(strcmp(buffer, "QUIT_SERVER\n") == 0){
-            printf("[SERVER] Server closing in 60 seconds!\n");
-            for(int i = 1; i <= 2; i++){
-                sleep(20);
-                printf("[SERVER] Server closing in %d seconds!\n", 60 - i*20);
-            }
-            sleep(10);
-            printf("[SERVER] Server closing in 10 seconds!\n");
-            for(int i = 1; i < 10; i++){
-                sleep(1);
-                printf("[SERVER] Server closing in %d seconds!\n", 10 - i);
-            }
-            sleep(5);
-            kill(getppid(), SIGINT);
+            server_closing();
             exit(0);
         }
 

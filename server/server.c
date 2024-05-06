@@ -1,13 +1,7 @@
-/*******************************************************************************
-* Server receives UDP and TCP packets from clients.                            *
-* Execution: ./server_exe {PORTO_TURMAS} {PORTO_CONFIG} {ficheiro configuração}    *
-* gcc server/server.c admin/admin.c admin/admin.h user/user.h -Wall -Wextra    *
-*  -o server/server_exe                                                        *         
-*******************************************************************************/
+#include "../functions/functions.h"
 #include "../admin/admin.h"
 #include "../client/client.h"
-#include "../user/user.h"
-#include "../functions/functions.h"
+#include "../shared_memory/shm_lib.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,11 +18,19 @@
 #include <sys/stat.h>
 #include <sys/msg.h>
 #include <assert.h>
+#include <sys/shm.h>
 
-#define PORTO_TURMAS    argv[1]
-#define PORTO_CONFIG    argv[2]
-#define CONFIG_FILE     argv[3]
-#define MAX_TCP_CLIENTS 10
+#define PORTO_TURMAS        argv[1]             // Port to receive TCP packets.
+#define PORTO_CONFIG        argv[2]             // Port to receive UDP packets.
+#define CONFIG_FILE         argv[3]             // Config file path.
+#define MAX_TCP_CLIENTS     10                  // Maximum number of TCP clients.
+
+struct sockaddr_in server_udp;                  // UDP socket address.
+struct sockaddr_in server_tcp;                  // TCP socket address.
+struct sockaddr_in client_tcp;                  // TCP client address.
+int client_addr_size = sizeof(client_tcp);      // TCP client address size.
+int tcp_socket;                                 // TCP socket.
+int udp_socket;                                 // UDP socket.
 
 /*
 * Handles a TCP connection.
@@ -41,16 +43,29 @@ void handle_tcp_connection(int client_id);
 */
 void handle_udp_connection(int udp_socket);
 /*
-* Checks if login command was used correctly.
+* Checks if login comstructmand was used correctly.
 * @param input Login command received from user.
 * @return If login is correct returns the user received,
 *         otherwise returns null.
 */
 struct_user verify_login_command(char* input, char* message);
 /*
-* Handles SIGINT signal.
+* Checks if user logged out.
 */
-void sigint_handler();
+int handle_logout(char* buffer);
+/*
+* Creates a message queue.
+*/
+void creates_message_queue();
+/*
+* Handles signals.
+*/
+void signal_handler(int signum);
+/*
+* Function to check if there are finished processes.
+*/
+void check_finished_processes();
+
 // Array to save all processes id that are responsible to handle TCP connection with MAX_TCP_CLIENTS length.
 pid_t tcp_pids[MAX_TCP_CLIENTS];
 // Amount of current TCP connections.
@@ -58,19 +73,46 @@ int tcp_pids_index = 0;
 // UDP connection pid.
 pid_t udp_pid;
 
+/************************************************************************************
+* Server receives UDP and TCP packets from clients.                                 *
+* Execution: ./class_server {PORTO_TURMAS} {PORTO_CONFIG} {ficheiro configuração}   *        
+*************************************************************************************/
+
 int main(int argc, char *argv[]){
-    signal(SIGINT, sigint_handler);
+    signal(SIGINT, signal_handler); // Handle signals.
+    signal(SIGTERM, signal_handler); // Handle signals.
 
-    /* Check if all arguments have been given */
-    if(argc != 4)
+    /* 
+    *   Check if all arguments have been given 
+    */
+    if(argc != 4){
         error("./%s <PORTO_TURMAS> <PORTO_CONFIG> <ficheiro configuração>\n", argv[0]);
+    }
 
-    define_config_file(CONFIG_FILE);
+    /*
+    * Definitions to well functioning of the server
+    */
 
-    struct sockaddr_in server_udp, server_tcp;
+    define_config_file(CONFIG_FILE);    // Define the config file path.
+    creates_message_queue();            // Creates a message queue to communicate with children processes.  
+
+    shmid = create_shared_memory();     // Create shared memory
     
-    struct sockaddr_in client_tcp;
-    int client_addr_size = sizeof(client_tcp);
+    /* Initialize shared memory */
+    void* shared_var = attach_shared_memory(shmid);
+
+    classes_list* classes = (classes_list*) shared_var;     // Classes list.
+    classes->current_size = 0;
+
+    users_list* users = (users_list*)((char*) shared_var + sizeof(classes_list));    // Users list.
+    users->current_size = 0;
+
+    detach_shared_memory(shared_var); 
+    printf("[%s] LOG - Shared memory created!\n", get_time());
+
+    /*
+    * Connections definitions.
+    */
     
     // Preenchimento da socket address structure - udp
 	server_udp.sin_family = AF_INET;
@@ -80,61 +122,42 @@ int main(int argc, char *argv[]){
     // Preenchimento da socket address structure - tcp
     bzero((void *) &server_tcp, sizeof(server_tcp));
     server_tcp.sin_family = AF_INET;
-    server_tcp.sin_addr.s_addr = htonl(INADDR_ANY);
     server_tcp.sin_port = htons(atoi(PORTO_TURMAS));
+    server_tcp.sin_addr.s_addr = htonl(INADDR_ANY);
 
     /* Handle TCP */
 
-    // TCP socket
-    int tcp_socket;
-    if((tcp_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) 
-        error("Na funcao socket");
+    if((tcp_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0){ 
+        error("[%s] LOG - Error socket(): ", get_time());
+    }
 
-    if(bind(tcp_socket, (struct sockaddr*) &server_tcp, sizeof(server_tcp)) < 0) 
-        error("Na funcao bind");
+    if(bind(tcp_socket, (struct sockaddr*) &server_tcp, sizeof(server_tcp)) < 0){
+        error("[%s] LOG - Error bind(): ", get_time());
+    }
 
-    if(listen(tcp_socket, 5) < 0) 
-        error("Na funcao listen");
+    if(listen(tcp_socket, MAX_TCP_CLIENTS) < 0){
+        error("[%s] LOG - Error listen(): ", get_time());
+    }
     
     /* Handle UDP */
 
-    // UDP socket
-    int udp_socket;
-	if((udp_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) 
-		error("Erro na criação do socket");
-
-	if(bind(udp_socket, (struct sockaddr*) &server_udp, sizeof(server_udp)) == -1)
-		error("Erro no bind");
-
-    /* Creation of message queue to communicate with children processes */
-    key = ftok(MSQ_QUEUE_PATH, 'A');
-    if (key == -1) {
-        perror("ftok");
-        exit(EXIT_FAILURE);
+	if((udp_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1){
+        error("[%s] LOG - Error socket(): ", get_time());
     }
 
-    // Try to delete the key if she exists
-    mq_id = msgget(key, 0); // Get message queue id.
-    if(mq_id != -1){
-        if(msgctl(mq_id, IPC_RMID, NULL) == -1){
-            error("[%s] LOG - msgctl: ");
-        }
-        printf("[%s] LOG - Message queue deleted\n", get_time());
-    }
-    
-    mq_id = msgget(key, IPC_CREAT | 0700);
-    if(mq_id == -1){
-        error("msgget");
+	if(bind(udp_socket, (struct sockaddr*) &server_udp, sizeof(server_udp)) == -1){
+        error("[%s] LOG - Error bind(): ", get_time());
     }
 
-    printf("[%s] LOG - Message queue created\n", get_time());
-
-    /* Creates a single process to every time that a TCP connection is received, the process
+    /* 
+    *  Creates a single process to every time that a TCP connection is received, the process
     *  creates a new process to handle the connection.
     */
     pid_t tcp_pid;
     if((tcp_pid = fork()) == 0){
         while(tcp_pids_index < MAX_TCP_CLIENTS){
+            //check_finished_processes();
+            
             pid_t pid;
 
             //clean finished child processes, avoiding zombies
@@ -151,8 +174,8 @@ int main(int argc, char *argv[]){
                 printf("[%s] LOG - New TCP connection received. Process %d created!\n", get_time(), pid);
                 tcp_pids[tcp_pids_index] = pid;
                 tcp_pids_index++;
-                close(client_id);
             }
+            close(client_id);
         }
         exit(0);
     }
@@ -195,7 +218,18 @@ void handle_tcp_connection(int client_id){
     struct_user user = verify_login_command(client_buffer, message);
     if(strcmp(user.username, "a") != 0){
         if(verify_login(&user, "TCP")){
-            printf("[%s] LOG - User %s logged in!\n", get_time(), user.username);
+            // Register user on users list.
+            /*
+            void* shared_var = attach_shared_memory(shmid);
+            users_list* users = (users_list*)((char*) shared_var + sizeof(classes_list));
+            strcpy(users->users[users->current_size].username, user.username);
+            strcpy(users->users[users->current_size].password, user.password);
+            strcpy(users->users[users->current_size].type, user.type);
+            users->current_size++;
+            detach_shared_memory(shared_var);
+            */
+
+            printf("[%s] LOG - User '%s' logged in!\n", get_time(), user.username);
 
             sprintf(message, "OK [%s]", user.type);
             write(client_id, message, strlen(message));
@@ -205,44 +239,66 @@ void handle_tcp_connection(int client_id){
                 client_buffer[nread] = '\0';
                 
                 printf("[%s] LOG - Received message from TCP: %s\n", get_time(), client_buffer);
+                
+                /*
+                if(handle_logout(client_buffer)){
+                    void* shared_var = attach_shared_memory(shmid);
+                    users_list* users = (users_list*)((char*) shared_var + sizeof(classes_list));
+                    int index = find_user(users, user.username);
+                    if(index != -1){
+                        for(int i = index; i < users->current_size - 1; i++){
+                            strcpy(users->users[i].username, users->users[i + 1].username);
+                            strcpy(users->users[i].password, users->users[i + 1].password);
+                            strcpy(users->users[i].type, users->users[i + 1].type);
+                        }
+                        users->current_size--;
+                    }
+                    return;
+                }
+                */
 
-                int temp = client_verify_command(client_buffer, user, message);
-                if(temp == -1){
+                char** args = client_verify_command(client_buffer, user, message);
+                if(args == NULL){              
                     write(client_id, message, strlen(message));
-                } else if(temp == 0){
+                } else if(strcmp(args[0], "ERROR") == 0){
                     write(client_id, message, strlen(message));
-                } else{
+                } else{   
                     if(strcmp(message, "LIST_CLASSES") == 0){
-                        strcpy(message, "From server: LIST_CLASSES");
+                        strcpy(message, list_classes());
                         write(client_id, message, strlen(message));
-                        // POSTERIORMENTE CHAMA-SE A FUNCAO RESPONSÁVEL
                     } else if(strcmp(message, "LIST_SUBSCRIBED") == 0){
-                        strcpy(message, "From server: LIST_SUBSCRIBED");
+                        char* list = list_subscribed(user);
+                        strcpy(message, list);
+                        free(list);
                         write(client_id, message, strlen(message));
-                        // POSTERIORMENTE CHAMA-SE A FUNCAO RESPONSÁVEL
                     } else if(strcmp(message, "SUBSCRIBE_CLASS") == 0){
-                        strcpy(message, "From server: SUBSCRIBE_CLASS");
+                        strcpy(message, subscribe_class(user, args[0]));
                         write(client_id, message, strlen(message));
-                        // POSTERIORMENTE CHAMA-SE A FUNCAO RESPONSÁVEL
                     } else if(strcmp(message, "CREATE_CLASS") == 0){
-                        strcpy(message, "From server: CREATE_CLASS");
+                        strcpy(message, "OK ");
+                        strcat(message, create_new_class(user, args[0], atoi(args[1])));                        
                         write(client_id, message, strlen(message));
-                        // POSTERIORMENTE CHAMA-SE A FUNCAO RESPONSÁVEL
                     } else if(strcmp(message, "SEND") == 0){
-                        strcpy(message, "From server: SEND");
+                        if(send_message(args[0], args[1])){
+                            strcpy(message, "OK");
+                        } else{
+                            strcpy(message, "ERROR");
+                        }
                         write(client_id, message, strlen(message));
-                        // POSTERIORMENTE CHAMA-SE A FUNCAO RESPONSÁVEL
+                    } else if(strcmp(message, "HELP") == 0){
+                        strcpy(message, help_client(user));
+                        write(client_id, message, strlen(message));
                     }
                 }
             }
         } else{
             strcpy(message, "REJECTED");
             write(client_id, message, strlen(message));
-        }
+        } 
     } else{
         write(client_id, message, strlen(message));
     }
-
+    free(message);
     close(client_id);
     return;
 }
@@ -263,7 +319,7 @@ void handle_udp_connection(int udp_socket){
     
     fflush(stdout);
     
-    printf("UDP: %s\n", admin_buffer);
+    printf("[%s] LOG - Received message from UDP: %s\n", get_time(), admin_buffer);
     
     char* message = (char*) malloc(BUFFER_LEN * sizeof(char));
     if(message == NULL)
@@ -284,7 +340,7 @@ void handle_udp_connection(int udp_socket){
                 admin_buffer[recv_len] = '\0';
                 remove_line_break(admin_buffer);
 
-                printf("UDP: %s\n", admin_buffer);
+                printf("[%s] LOG - Received message from UDP: %s\n", get_time(), admin_buffer);
                 
                 char** args = verify_admin_command(admin_buffer, message);
                 if(args == NULL){
@@ -293,19 +349,27 @@ void handle_udp_connection(int udp_socket){
                     sendto(udp_socket, message, strlen(message), 0, (struct sockaddr *) &admin, udp_socket_len);
                 } else {
                     if(strcmp(message, "DEL\n") == 0){
-                        strcpy(message,"From server: DEL\n");
+                        if(remove_user(args)){
+                            strcpy(message, "OK\n");
+                            printf("[%s] - LOG - User removed: %s\n", get_time(), args[0]);
+                        } else{
+                            strcpy(message, "ERROR\n");
+                        }
                         sendto(udp_socket, message, strlen(message), 0, (struct sockaddr *) &admin, udp_socket_len);
-                        //POSTERIORMENTE CHAMA-SE A FUNÇÃO RESPONSÁVEL
                     } else if(strcmp(message,"ADD_USER\n") == 0){
-                        strcpy(message, "From server: ADD_USER\n");
+                        if(add_user(args)){
+                            strcpy(message, "OK\n");
+                            printf("[%s] - LOG - User added: %s\n", get_time(), args[0]);
+                        } else{
+                            strcpy(message, "ERROR\n");
+                        }
                         sendto(udp_socket, message, strlen(message), 0, (struct sockaddr *) &admin, udp_socket_len);
-                        printf("%s\n", add_user(args));
-                        //POSTERIORMENTE CHAMA-SE A FUNÇÃO RESPONSÁVEL
                     } else if(strcmp(message, "LIST\n") == 0){
-                        strcpy(message,"From server: LIST\n");
+                        char* result = list_users();
+                        strcpy(message, result);
+                        free(result);
                         sendto(udp_socket, message, strlen(message), 0, (struct sockaddr *) &admin, udp_socket_len);
-                        //POSTERIORMENTE CHAMA-SE A FUNÇÃO RESPONSÁVEL
-                    } if(strcmp(message, "QUIT_SERVER\n") == 0){
+                    } else if(strcmp(message, "QUIT_SERVER\n") == 0){
                         sendto(udp_socket, message, strlen(message), 0, (struct sockaddr *) &admin, udp_socket_len);
                         queue_message msg ={
                             .priority = 1,
@@ -329,6 +393,9 @@ void handle_udp_connection(int udp_socket){
                         sleep(5);
                         kill(getppid(), SIGINT);
                         exit(0);
+                    } else if(strcmp(message, "HELP\n") == 0){
+                        strcpy(message, help_admin(user));
+                        sendto(udp_socket, message, strlen(message), 0, (struct sockaddr *) &admin, udp_socket_len);
                     }
                 }
             }
@@ -339,6 +406,7 @@ void handle_udp_connection(int udp_socket){
     } else{
         sendto(udp_socket, message, strlen(message), 0, (struct sockaddr *) &admin, udp_socket_len);
     }
+    free(message);
     close(udp_socket);
     return;
 }
@@ -375,22 +443,93 @@ struct_user verify_login_command(char* input, char* message){
     strcpy(user.password, token);
     remove_line_break(user.password);
 
+    /*
+    * Verify if user is logged in.
+    */
+    void* shared_var = attach_shared_memory(shmid);
+    users_list* users = (users_list*)((char*) shared_var + sizeof(classes_list));
+    int index = find_user(users, user.username);
+    if(index != -1){
+        detach_shared_memory(shared_var);
+        return user_null;
+    }
+    detach_shared_memory(shared_var);
+
     return user;
 }
 
-void sigint_handler(){
-    for(int i = 0; i < MAX_TCP_CLIENTS; i++){
-        kill(tcp_pids[i], SIGINT);
+int handle_logout(char* buffer){
+    char copy[strlen(buffer) + 1];
+    strcpy(copy, buffer);
+
+    char* token = strtok(copy, " ");
+    token = strtok(NULL, " ");
+    if(strcmp(token, "exiting...") == 0){
+        return 1;
     }
-    kill(udp_pid, SIGINT);
+    return 0;
+}
+
+void creates_message_queue(){
+    /* Creation of message queue to communicate with children processes */
+    key_msg = ftok(MSQ_QUEUE_PATH, 'A');
+    if(key_msg == -1) {
+        perror("ftok");
+        exit(EXIT_FAILURE);
+    }
 
     // Try to delete the key if she exists
-    mq_id = msgget(key, 0); // Get message queue id.
+    mq_id = msgget(key_msg, 0); // Get message queue id.
     if(mq_id != -1){
         if(msgctl(mq_id, IPC_RMID, NULL) == -1){
             error("[%s] LOG - msgctl: ");
         }
         printf("[%s] LOG - Message queue deleted\n", get_time());
     }
-    exit(0);
+    
+    mq_id = msgget(key_msg, IPC_CREAT | 0700);
+    if(mq_id == -1){
+        error("msgget");
+    }
+
+    printf("[%s] LOG - Message queue created\n", get_time());
+}
+
+void signal_handler(int signum){
+    if(signum == SIGINT){
+        // Try to delete the key if she exists
+        mq_id = msgget(key_msg, 0); // Get message queue id.
+        if(mq_id != -1){
+            if(msgctl(mq_id, IPC_RMID, NULL) == -1){
+                error("[%s] LOG - msgctl: ");
+            }
+            printf("[%s] LOG - Message queue deleted\n", get_time());
+        }
+
+        // Remove Shared Memory.
+        remove_shared_memory(shmid);
+        printf("[%s] LOG - Shared memory removed!\n", get_time());
+
+        for(int i = 0; i < MAX_TCP_CLIENTS; i++){
+            kill(tcp_pids[i], SIGKILL);
+        }
+        kill(udp_pid, SIGKILL);
+
+        exit(0);
+    }
+}
+
+void check_finished_processes(){
+    for(int i = 0; i < tcp_pids_index; i++){
+        pid_t result = waitpid(tcp_pids[i], NULL, WNOHANG);
+
+        if(result > 0){
+            // Process finished. Remove from array.
+            for(int j = i; j < tcp_pids_index - 1; j++){
+                tcp_pids[j] = tcp_pids[j + 1];
+            }
+            tcp_pids_index--;
+            i--;
+        }
+    }
 }

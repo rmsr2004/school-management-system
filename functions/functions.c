@@ -1,5 +1,4 @@
 #include "functions.h"
-#include "../user/user.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,10 +6,13 @@
 #include <unistd.h>
 #include <time.h>
 #include <ctype.h>
+#include <signal.h>
 
 char* config_file;
 int mq_id;
-key_t key;
+key_t key_msg;
+key_t key_shm;
+int shmid;
 
 void define_config_file(char* filename){
     config_file = (char*) malloc(50 * sizeof(char));
@@ -20,6 +22,10 @@ void define_config_file(char* filename){
 int verify_login(struct_user* user, char* connection_type){
     struct_user* new_user = get_user_from_file(user->username);
     if(new_user == NULL){
+        return 0;
+    }
+
+    if(strcmp(new_user->password, user->password) != 0){
         return 0;
     }
 
@@ -33,7 +39,7 @@ int verify_login(struct_user* user, char* connection_type){
         }
     } else{
         if(strcmp(new_user->type, "administrador") != 0){ 
-            strcpy(new_user->type, user->type);
+            strcpy(user->type, new_user->type);
             return 1;
         }
     }
@@ -43,7 +49,7 @@ int verify_login(struct_user* user, char* connection_type){
 char* get_time(){
     time_t current_time;
     struct tm *timeinfo;
-    char* str_time = (char*) malloc(sizeof(char) * 9); // String para armazenar a hora no formato "HH:MM:SS"
+    char* str_time = (char*) malloc(sizeof(char) * 9);
 
     time(&current_time);
     timeinfo = localtime(&current_time);
@@ -79,21 +85,45 @@ struct_user* get_user_from_file(char* username){
     return NULL;
 }
 
+char** create_args_array(int args_number){
+    char **args = malloc(args_number * sizeof(char *));
+    if(args == NULL){
+        printf("[%s] - LOG : create_args_array -> malloc(): ", get_time());
+        return NULL;
+    }
+
+    for(int i = 0; i < args_number; i++){
+        args[i] = malloc(20 * sizeof(char));
+
+        if(args[i] == NULL){
+            printf("[%s] - LOG : create_args_array -> args[i] malloc(): ", get_time());
+            return NULL;
+        }
+    }
+    return args;
+}
+
 int is_number(char *string){
-    for(size_t i = 0; i < strlen(string); i++)
-        if(string[i] < '0' || string[i] > '9')
+    for(size_t i = 0; i < strlen(string); i++){
+        if(string[i] < '0' || string[i] > '9'){
             return 0;
+        }
+    }
     return 1;
 }
+
 void to_upper(char* string){
-    for(size_t i = 0; i < strlen(string); i++)
+    for(size_t i = 0; i < strlen(string); i++){
         string[i] = toupper(string[i]);
+    }
     return;
 }
+
 int verify_string(char* string){
     for(size_t i = 0; i < strlen(string); i++){
-        if(string[i] >= 65 && string[i] <= 122)
+        if(string[i] >= 65 && string[i] <= 122){
             continue;
+        }
         return 0;
     }
     return 1;
@@ -107,12 +137,20 @@ void error(const char *format, ...){
     perror("");
 
     va_end(args);
+    kill(getpid(), SIGINT);
     exit(-1);
 }
 
 void remove_line_break(char* string){
-  for(size_t i = 0; i < strlen(string); i++)
-    if(string[i] == '\n')
-      string[i] = '\0';
-  return;
+    int length = strlen(string);
+    if(length == 0)
+        return;
+        
+    for(int i = length - 1; i >= 0; i--){
+        if(string[i] == '\n'){
+            string[i] = '\0';
+            return;
+        }
+    }
+    return;
 }
