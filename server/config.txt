@@ -1,3 +1,7 @@
 jorge;1234;administrador
 joana;1234;professor
 manuel;1234;aluno
+joao;1234;aluno
+rodrigo;1234;aluno
+irineu;1234;aluno
+opa;1234;aluno

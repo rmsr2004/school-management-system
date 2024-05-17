@@ -1,7 +1,7 @@
 CC      = gcc
 OBJS    = server/server.o admin/admin.o functions/functions.o user/user.o client/client.o class/class.o shared_memory/shm_lib.o
 PROG    = class_server
-FLAGS   = -Wall -Wextra
+FLAGS   = -Wall -Wextra -g -pthread -lpthread -D_REENTRANT
 
 all: ${PROG}
 

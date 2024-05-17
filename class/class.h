@@ -6,23 +6,28 @@
 #include <netinet/in.h>
 
 /*
-* Class Containing the name, size, professor, students and address of the class.
+*   Class Containing the name, size, professor, students and address of the class.
 */
 struct class{
-    char name[20];
-    int size;
-    int current_size;
-    struct_user professor;
-    struct_user students[MAX_USERS];
-    struct sockaddr_in addr;
+    char name[ARGS_LEN];                // name of the class
+    int size;                           // maximum number of students in the class     
+    int current_size;                   // current number of students in the class
+    struct_user professor;              // professor of the class
+    struct_user students[MAX_USERS];    // students in the class
+    struct sockaddr_in addr;            // address of the class
 };
 
+/*-----------------------------------------------------------------------------------------------------*
+*                                       FUNCTIONS TO MANAGE A CLASS                                    *
+*------------------------------------------------------------------------------------------------------*/
+
 /*
-* Returns 1 if the class is full, 0 otherwise.
+*   Returns 1 if the class is full, 0 otherwise.
 */
 int is_full(struct class* class);
 /*
-* Add a student to a class.
+*   Add a student to a class.
+*   Returns 1 if the student was added, 0 otherwise.
 */
 int add_student(struct class* class, struct_user student);
 

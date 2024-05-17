@@ -1,4 +1,5 @@
 #include "functions.h"
+#include "../shared_memory/shm_lib.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,11 +9,43 @@
 #include <ctype.h>
 #include <signal.h>
 
+/*-----------------------------------------------------------------------------------------------------*
+*                                       GLOBAL VARIABLES                                               *
+*------------------------------------------------------------------------------------------------------*/
 char* config_file;
-int mq_id;
-key_t key_msg;
-key_t key_shm;
 int shmid;
+pid_t tcp_pids[MAX_USERS];                                                         
+int tcp_pids_index = 0;                  
+pid_t tcp_pid;                             
+pid_t udp_pid;                           
+struct sockaddr_in server_udp;               
+struct sockaddr_in server_tcp;                  
+struct sockaddr_in client_tcp;                
+int client_addr_size = sizeof(client_tcp);    
+int tcp_socket;                                                              
+int udp_socket;            
+int recv_len;                    
+char* input;                      
+char* buffer;                    
+struct sockaddr_in server;       
+socklen_t slen = sizeof(server);   
+int fd;                                      
+int multicast_sock[CLASSES_SIZE];                
+int multicast_index = 0;                      
+struct ip_mreq multicast_mreq[CLASSES_SIZE];      
+int logged_in = 0;                          
+int last_port_used = 5000;                      
+char* buffer;                                 
+char* input;                  
+pid_t pid;                               
+pid_t multicast_pid[CLASSES_SIZE];         
+pid_t father_pid;           
+int client_id;                    
+/*-----------------------------------------------------------------------------------------------------*/
+
+/*-----------------------------------------------------------------------------------------------------*
+*                                            FUNCTIONS                                                 *
+*------------------------------------------------------------------------------------------------------*/
 
 void define_config_file(char* filename){
     config_file = (char*) malloc(50 * sizeof(char));
@@ -29,17 +62,38 @@ int verify_login(struct_user* user, char* connection_type){
         return 0;
     }
 
+    void* shared_var = attach_shared_memory(shmid);
+
     /*
     *   É login de um admin
     */
     if(strcmp(connection_type, "UDP") == 0){
         if(strcmp(new_user->type, "administrador") == 0){
-            strcpy(user->type, "administrador"); 
+            strcpy(user->type, "administrador");
+            users_list* users = (users_list*)((char*) shared_var + sizeof(classes_list));
+            for(int i = 0; i < users->current_size; i++){
+                if(strcmp(users->users[i].type, "administrador") == 0){
+                    detach_shared_memory(shared_var);
+                    return 0;
+                }
+            }
+            detach_shared_memory(shared_var);
             return 1;
         }
     } else{
         if(strcmp(new_user->type, "administrador") != 0){ 
             strcpy(user->type, new_user->type);
+            /*
+            * Verify if user is logged in.
+            */
+            
+            users_list* users = (users_list*)((char*) shared_var + sizeof(classes_list));
+            int index = find_user(users, user->username);
+            if(index != -1){
+                detach_shared_memory(shared_var);
+                return 0;
+            }
+            detach_shared_memory(shared_var);
             return 1;
         }
     }
@@ -49,7 +103,10 @@ int verify_login(struct_user* user, char* connection_type){
 char* get_time(){
     time_t current_time;
     struct tm *timeinfo;
-    char* str_time = (char*) malloc(sizeof(char) * 9);
+    char* str_time = (char*) malloc(sizeof(char) * 25);
+    if(str_time == NULL){
+        error("get_time -> malloc(): ");
+    }
 
     time(&current_time);
     timeinfo = localtime(&current_time);
@@ -66,9 +123,12 @@ struct_user* get_user_from_file(char* username){
     }
 
     struct_user* user = (struct_user*) malloc(sizeof(struct_user));
+    if(user == NULL){
+        error("get_user_from_file -> malloc(): ");
+    }
 
-    char line[INPUT_SIZE], *token;
-    while(fgets(line, INPUT_SIZE-1, f) != NULL){
+    char line[3*ARGS_LEN + 3], *token;
+    while(fgets(line, sizeof(line), f) != NULL){
         token = strtok(line, ";");
         if(strcmp(token, username) == 0){
             strcpy(user->username, username);
@@ -86,14 +146,14 @@ struct_user* get_user_from_file(char* username){
 }
 
 char** create_args_array(int args_number){
-    char **args = malloc(args_number * sizeof(char *));
+    char **args = malloc(args_number * sizeof(char*));
     if(args == NULL){
         printf("[%s] - LOG : create_args_array -> malloc(): ", get_time());
         return NULL;
     }
 
     for(int i = 0; i < args_number; i++){
-        args[i] = malloc(20 * sizeof(char));
+        args[i] = malloc(ARGS_LEN * sizeof(char));
 
         if(args[i] == NULL){
             printf("[%s] - LOG : create_args_array -> args[i] malloc(): ", get_time());
@@ -112,14 +172,21 @@ int is_number(char *string){
     return 1;
 }
 
-void to_upper(char* string){
-    for(size_t i = 0; i < strlen(string); i++){
-        string[i] = toupper(string[i]);
+char* to_upper(char* string){
+    char* copy = (char*) malloc(strlen(string) * sizeof(char));
+    if(copy == NULL){
+        error("to_upper -> malloc(): ");
     }
-    return;
+    strcpy(copy, string);
+
+    for(size_t i = 0; i < strlen(copy); i++){
+        copy[i] = toupper(copy[i]);
+    }
+    return copy;
 }
 
 int verify_string(char* string){
+    remove_line_break(string);
     for(size_t i = 0; i < strlen(string); i++){
         if(string[i] >= 65 && string[i] <= 122){
             continue;

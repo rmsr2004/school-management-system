@@ -8,5 +8,5 @@ make -f makefiles/admin_makefile all
 make -f makefiles/admin_makefile clean
 
 # Executar o programa
-echo "Executando o admin UDP..."
 ./class_admin 127.0.0.1 9876
+rm -f class_admin

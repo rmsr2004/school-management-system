@@ -1,7 +1,7 @@
 CC      = gcc
-OBJS    = functions/functions.o admin/udp_admin.o admin/admin.o
+OBJS    = functions/functions.o admin/udp_admin.o admin/admin.o shared_memory/shm_lib.o
 PROG    = class_admin
-FLAGS   = -Wall -Wextra
+FLAGS   = -Wall -Wextra -pthread -lpthread -D_REENTRANT
 
 all: ${PROG}
 
@@ -19,3 +19,6 @@ functions/functions.c:	functions/functions.h
 
 admin/admin.o:	admin/admin.c
 admin/admin.c:	admin/admin.h
+
+shared_memory/shm_lib.o:	shared_memory/shm_lib.c
+shared_memory/shm_lib.c:	shared_memory/shm_lib.h

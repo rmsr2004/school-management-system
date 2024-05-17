@@ -2,22 +2,33 @@
 #include "../shared_memory/shm_lib.h"
 #include <string.h>
 
+/*-----------------------------------------------------------------------------------------------------*
+*                                       FUNCTIONS TO MANAGE A CLASS                                    *
+*------------------------------------------------------------------------------------------------------*/
+
 int is_full(struct class* class){
-    return class->current_size >= class->size;
+    return class->current_size == class->size;
 }
 
 int add_student(struct class* class, struct_user student){
-    struct_user new_student;
-    strcpy(new_student.username, student.username);
-    strcpy(new_student.password, student.password);
-    strcpy(new_student.type, student.type);
+    /*
+    *   Check if student is already in the class.
+    */
+
+    for(int i = 0; i < class->current_size; i++){
+        if(strcmp(class->students[i].username, student.username) == 0){
+            return 0;
+        }
+    }
 
     if(is_full(class)){
         return 0;
     }
 
-    class->students[class->current_size] = new_student;
+    class->students[class->current_size] = student;
     class->current_size += 1;
     
     return 1;
 }
+
+// class.c

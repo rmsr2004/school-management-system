@@ -1,10 +1,3 @@
-/**********************************************************************
- * CLIENTE liga ao servidor (definido em argv[1]) no porto especificado
- * (em argv[2])
- * USO: >cliente <enderecoServidor>  <porto>
- **********************************************************************/
-// Rodrigo Miguel Santos Rodrigues - 2022233032
-// João Afonso dos Santos Simões   - 2022236316 
 #include "../functions/functions.h"
 #include "../admin/admin.h"
 #include <stdio.h>
@@ -18,48 +11,66 @@
 #include <sys/wait.h>
 #include <signal.h>
 
+/*------------------------------------------------------------------------------------------------------*
+*                                           UDP ADMIN INTERFACE                                         *
+*********************************************************************************************************
+*   This program is a client that connects to the server using the UDP protocol.                        *
+*   The client send commands to the server and receive responses.                                       *
+*   Command Syntax:                                                                                     *
+*       - class_admin {endereço do servidor} {PORTO_CONFIG}                                             *
+*********************************************************************************************************/
 int main(int argc, char* argv[]){
-    if(argc != 3) error("Usage: %s <host> <port> \n", argv[0]);
-    
-    int s;
-    struct sockaddr_in server;
+    signal(SIGINT, sigint_handler); // Handle SIGINT signal
+
+    if(argc != 3){
+        error("Usage: %s <host> <port> \n", argv[0]);
+    }
 
     // Socket creation
-    if((s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
-        error("error na criação do socket");
+    if((udp_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0){
+        error("Error creating socket");
+    }
 
-    /* Set up the server name */
-    server.sin_family      = AF_INET;                      /* Internet Domain    */
-    server.sin_port        = htons(atoi(argv[2]));         /* Server Port        */
-    server.sin_addr.s_addr = inet_addr(argv[1]);           /* Server's Address   */
-    
-    /*
-        Command Line Interface
-    */    
-    int recv_len;
-
-    // variável para guardar mensagem a enviar para o servidor
-    char* input = (char*) malloc(INPUT_SIZE * sizeof(char)); 
-    if(input == NULL) 
-        error("Erro a alocar memória!");
-
-    // variavel para guardar mensagem recebida do servidor 
-    char buffer[BUFFER_LEN];
+    /* 
+    *   Set up the server 
+    */
+    server.sin_family      = AF_INET;                      // Internet Domain  
+    server.sin_port        = htons(atoi(argv[2]));         // Server Port       
+    server.sin_addr.s_addr = inet_addr(argv[1]);           // Server's Address  
     socklen_t slen = sizeof(server);
     
+    input = (char*) malloc(INPUT_SIZE * sizeof(char)); 
+    if(input == NULL){
+        error("Error malloc");
+    }
+
+    buffer = (char*) malloc(BUFFER_LEN * sizeof(char));
+    if(buffer == NULL){
+        error("Error malloc");
+    }
+
+    printf("Connection established\n");
+
+    /*
+    *   Command Line Interface
+    */   
     while(1){
-        if(fgets(input, INPUT_SIZE-1, stdin) == NULL)
-            error("Erro a ler do stdin");
+        printf(">> ");
+
+        if(fgets(input, INPUT_SIZE-1, stdin) == NULL){
+            error("Error fgets()");
+        }
         remove_line_break(input);
 
-        // Enviar mensagem para o servidor
-        if(sendto(s, input, (strlen(input)+1), 0, (struct sockaddr *)&server, sizeof(server)) < 0)
+        // Send message to server
+        if(sendto(udp_socket, input, (strlen(input)+1), 0, (struct sockaddr *)&server, sizeof(server)) < 0){
             error("sendto()");
+        }
         
-        // Receber resposta do servidor
-        if((recv_len = recvfrom(s, buffer, BUFFER_LEN, 0, (struct sockaddr *) &server, &slen)) == -1)
+        // Receive message from server
+        if((recv_len = recvfrom(udp_socket, buffer, BUFFER_LEN, 0, (struct sockaddr *) &server, &slen)) == -1){
 	        error("Erro no recvfrom");
-        
+        }
         buffer[recv_len] = '\0';
 
         if(strcmp(buffer, "QUIT_SERVER\n") == 0){
@@ -67,15 +78,15 @@ int main(int argc, char* argv[]){
             exit(0);
         }
 
-        // imprimir resposta do servidor
         printf("%s", buffer);
 
-        // Se a resposta for "SAIR", sai do loop e a sessão é fechada
-        if(strcmp(buffer, "REJECTED") == 0)
+        // if message received is REJECTED or LOGIN <username> <password> break the loop
+        if(strcmp(buffer, "REJECTED\n") == 0 || strcmp(buffer, "LOGIN <username> <password>") == 0)
             break;
     }
-
-    /* Deallocate the socket */
-    close(s);
+    printf("\n");
+    close(udp_socket);  // Deallocate the socket
     return 0;
 }
+
+// udp_admin.c

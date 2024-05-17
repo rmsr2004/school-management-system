@@ -6,5 +6,6 @@ make -f makefiles/server_makefile all
 make -f makefiles/server_makefile clean
 
 # Executar o programa
-echo "Executando o servidor..."
 ./class_server 9000 9876 server/config.txt
+
+rm -f class_server

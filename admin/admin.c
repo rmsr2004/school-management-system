@@ -8,9 +8,14 @@
 #include <unistd.h>
 #include <signal.h>
 
+/*-----------------------------------------------------------------------------------------------------*
+*                                       FUNCTIONS THAT ADMIN HAVE                                      *
+*------------------------------------------------------------------------------------------------------*/
+
 char** verify_admin_command(char* input, char* message){
     remove_line_break(input);
-    char command[20];
+    
+    char command[ARGS_LEN];
 
     char* token = strtok(input, " ");
     if(token == NULL){
@@ -29,10 +34,10 @@ char** verify_admin_command(char* input, char* message){
             return args;
         }
         strcpy(args[0],token);        
-        // verificar se tem argumentos a mais
+        // check if there are more arguments
         token = strtok(NULL, " ");
         if(token == NULL){
-            // Não tem, então sucesso
+            // No more arguments, success
             strcpy(message, "DEL\n");
             return args;
         }
@@ -63,10 +68,10 @@ char** verify_admin_command(char* input, char* message){
             return args;
         }
         strcpy(args[2],token);
-        // verificar se tem argumentos a mais
+        // check if there are more arguments
         token = strtok(NULL, " ");
         if(token == NULL){
-            // Não tem, então sucesso
+            // No more arguments, success
             strcpy(message, "ADD_USER\n");
             return args;
         }
@@ -82,7 +87,7 @@ char** verify_admin_command(char* input, char* message){
             strcpy(args[0],"LIST");
             return args;
         }
-        // se tiver argumentos, dá errado
+        // if there are arguments, it's wrong
         strcpy(message, "LIST não tem argumentos\n");
         strcpy(args[0],"ERROR");
         return args;
@@ -95,7 +100,7 @@ char** verify_admin_command(char* input, char* message){
             strcpy(args[0], "QUIT_SERVER");
             return args;
         }
-        // se tiver argumentos, dá errado
+        // if there are arguments, it's wrong
         strcpy(message, "QUIT_SERVER não tem argumentos\n");
         strcpy(args[0],"ERROR");
         return args;
@@ -108,7 +113,7 @@ char** verify_admin_command(char* input, char* message){
             strcpy(args[0], "HELP");
             return args;
         }
-        // se tiver argumentos, dá errado
+        // if there are arguments, it's wrong
         strcpy(message, "HELP não tem argumentos\n");
         strcpy(args[0],"ERROR");
         return args;
@@ -119,49 +124,45 @@ char** verify_admin_command(char* input, char* message){
 }
 
 char* help_admin(){
-    char* message = (char*) malloc(150 * sizeof(char));
-
-    sprintf(message, "Available commands:\nADD_USER <username> <password> <administrador/aluno/professor_\nDEL <username>\nLIST\nQUIT_SERVER\n");
-    return message;
+    return "ADD_USER <username> <password> <administrador/aluno/professor>\nDEL <username>\nLIST\nQUIT_SERVER\n";
 }
 
-int add_user(char** args){
-    char username[50];
+int register_user(char** args){
+    char username[ARGS_LEN], password[ARGS_LEN], type[ARGS_LEN];
+    
     strcpy(username, args[0]);
-    char password[50];
     strcpy(password, args[1]);
-    char type[50];
     strcpy(type, args[2]);
 
     if(strcmp(type, "administrador") == 0 || strcmp(type, "aluno") == 0 || strcmp(type, "professor") == 0 ){
         FILE *f = fopen(config_file, "a");
-        if(f == NULL) {
-            error("[%d] LOG : add_user fopen(): ", get_time());
+        if(f == NULL){
+            error("[%d] LOG - add_user -> Error fopen(): ", get_time());
         }
 
         fprintf(f, "%s;%s;%s\n", username, password, type);
 
         if(fclose(f)){
-            error("[%d] LOG : add_user fclose(): ", get_time());
+            error("[%d] LOG - add_user -> Error fclose(): ", get_time());
         }
         return 1;
     }
     return 0;
 }
 
-int remove_user(char** args){
-    char username[50];
+int delete_user(char** args){
+    char username[ARGS_LEN];
     strcpy(username, args[0]);
 
     FILE *f = fopen(config_file, "r");
-    FILE *temp_file = fopen("server/temp.txt", "w");
+    FILE *temp_file = fopen("server/temp.txt", "w"); // Temporary file to store the new file without the user to delete
 
     if(f == NULL || temp_file == NULL){
         error("[%d] LOG : remove_user fopen(): ", get_time());
     }
 
-    char line[100];
-    char f_username[10], f_password[10], type[20];
+    char line[3*ARGS_LEN + 3];
+    char f_username[ARGS_LEN], f_password[ARGS_LEN], type[ARGS_LEN];
     int user_found = 0;
 
     while(fgets(line, sizeof(line), f)){
@@ -177,16 +178,17 @@ int remove_user(char** args){
             user_found = 1;
         }
     }
-
-    fclose(f);
-    fclose(temp_file);
+    
+    if(fclose(f) != 0 || fclose(temp_file) != 0){
+        error("[%d] LOG - delete_user -> Error fclose(): ", get_time());
+    }
 
     if(remove(config_file) != 0){
-        error("[%d] LOG : remove_user remove(): ", get_time());
+        error("[%d] LOG - delete_user -> Error remove(): ", get_time());
     }
 
     if(rename("server/temp.txt", config_file) != 0){
-        error("[%d] LOG : remove_user rename(): ", get_time());
+        error("[%d] LOG - delete_user -> Error remove(): ", get_time());
     }
 
     if(!user_found){
@@ -196,35 +198,53 @@ int remove_user(char** args){
 }
 
 char* list_users(){
-    char* result_message = malloc(200 * sizeof(char));
-    if(result_message == NULL){
-        error("[%d] - LOG : list_users malloc(): ", get_time());
-    }
-
-    memset(result_message, 0, 200);
-    FILE *f = fopen(config_file, "r");
+    FILE* f = fopen(config_file, "r");
     if(f == NULL){
-        error("[%d] - LOG : list_users fopen(): ", get_time());
+        error("[%d] LOG - list_users ->fopen(): ", get_time());
     }
 
-    char line[100];
-    char f_username[10], f_password[10], type[20];
+    int total_users = 0; // Total number of users
 
+    char line[3*ARGS_LEN + 3];
     while(fgets(line, sizeof(line), f)){
-        strcpy(f_username, strtok(line, ";"));
-        strcpy(f_password, strtok(NULL, ";"));
+        total_users++;
+    }
+    fclose(f);
+
+    char* result_message = malloc(total_users * (2*ARGS_LEN + 2) * sizeof(char));
+    if(result_message == NULL){
+        error("[%d] LOG - list_users -> Error malloc(): ", get_time());
+    }
+    memset(result_message, 0, total_users * (2*ARGS_LEN + 2));
+
+    f = fopen(config_file, "r");
+    if(f == NULL){
+        error("[%d] LOG - list_users ->fopen(): ", get_time());
+    }
+
+    char username[ARGS_LEN], type[ARGS_LEN];
+    while(fgets(line, sizeof(line), f)){
+        strcpy(username, strtok(line, ";"));
+        strtok(NULL, ";");
         strcpy(type, strtok(NULL, ";"));
 
         remove_line_break(type);
 
-        strcat(result_message, f_username);
+        strcat(result_message, username);
         strcat(result_message, " [");
         strcat(result_message, type);
         strcat(result_message, "]\n");
     }
-    fclose(f);
+    if(fclose(f) != 0){
+        error("[%d] LOG - list_users -> Error fclose(): ", get_time());
+    }
+
     return result_message;
 }
+
+/*-----------------------------------------------------------------------------------------------------*
+*                                       UPD_ADMIN.C FUNCTIONS                                          *
+*------------------------------------------------------------------------------------------------------*/
 
 void server_closing(){
     printf("[SERVER] Server closing in 60 seconds!\n");
@@ -241,3 +261,25 @@ void server_closing(){
     sleep(5);
     kill(getppid(), SIGINT);
 }
+
+void sigint_handler(){
+    if(input != NULL){
+        free(input);
+    }
+
+    if(buffer != NULL){
+        free(buffer);
+    }
+
+    char* message = malloc(18 * sizeof(char));
+    sprintf(message, "ADMIN exiting...");
+    sendto(udp_socket, message, (strlen(message)+1), 0, (struct sockaddr *)&server, sizeof(server));
+    
+    close(udp_socket);
+
+    free(message);
+    printf("\nExiting...\n");
+    exit(0);
+}
+
+// admin.c
