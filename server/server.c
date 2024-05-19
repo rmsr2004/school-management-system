@@ -1,3 +1,5 @@
+// João Afonso dos Santos Simões - 2022236316
+// Rodrigo Miguel Santos Rodrigues - 2022233032
 #include "../functions/functions.h"
 #include "../admin/admin.h"
 #include "../client/client.h"
@@ -403,6 +405,26 @@ void handle_udp_connection(int udp_socket){
 	char admin_buffer[BUFFER_LEN];  // Save messages from client 
     int recv_len;   // Number of bytes received from client.
 
+    char* message = (char*) malloc(BUFFER_LEN * sizeof(char));
+    if(message == NULL){
+        error("[%s] LOG - handle_udp_connection -> error malloc(): ");
+    }
+
+    /*
+    *	Avoid the problem of the first message not being sent on GNS3
+    */
+    
+    if((recv_len = recvfrom(udp_socket, admin_buffer, BUFFER_LEN-1, 0, (struct sockaddr *) &admin, (socklen_t *) &udp_socket_len)) == -1){
+        error("[%s] LOG - handle_udp_connection -> Error recvfrom(): ", get_time());
+    }
+    if((recv_len = recvfrom(udp_socket, admin_buffer, BUFFER_LEN-1, 0, (struct sockaddr *) &admin, (socklen_t *) &udp_socket_len)) == -1){
+        error("[%s] LOG - handle_udp_connection -> Error recvfrom(): ", get_time());
+    }
+    if((recv_len = recvfrom(udp_socket, admin_buffer, BUFFER_LEN-1, 0, (struct sockaddr *) &admin, (socklen_t *) &udp_socket_len)) == -1){
+        error("[%s] LOG - handle_udp_connection -> Error recvfrom(): ", get_time());
+    }
+
+ 	printf("[%s] LOG - Connection established with admin UDP\n", get_time());
 
     /*
     *   Verify login.
@@ -415,10 +437,6 @@ void handle_udp_connection(int udp_socket){
     
     printf("[%s] LOG - Received message from UDP: %s\n", get_time(), admin_buffer);
     
-    char* message = (char*) malloc(BUFFER_LEN * sizeof(char));
-    if(message == NULL){
-        error("[%s] LOG - handle_udp_connection -> error malloc(): ");
-    }
 
     struct_user user = verify_login_command(admin_buffer, message); // Struct with info from user received.
                                                                     // If user username is "a" then the login

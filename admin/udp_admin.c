@@ -1,3 +1,5 @@
+// João Afonso dos Santos Simões - 2022236316
+// Rodrigo Miguel Santos Rodrigues - 2022233032
 #include "../functions/functions.h"
 #include "../admin/admin.h"
 #include <stdio.h>
@@ -47,6 +49,23 @@ int main(int argc, char* argv[]){
     buffer = (char*) malloc(BUFFER_LEN * sizeof(char));
     if(buffer == NULL){
         error("Error malloc");
+    }
+
+        
+    /*
+    *	Avoid the problem of the first message not being sent on GNS3
+    */
+    
+    sprintf(input, "CONNECTION");
+    
+    if(sendto(udp_socket, input, (strlen(input)+1), 0, (struct sockaddr *)&server, sizeof(server)) < 0){
+        error("sendto()");
+    }
+    if(sendto(udp_socket, input, (strlen(input)+1), 0, (struct sockaddr *)&server, sizeof(server)) < 0){
+        error("sendto()");
+    }
+    if(sendto(udp_socket, input, (strlen(input)+1), 0, (struct sockaddr *)&server, sizeof(server)) < 0){
+        error("sendto()");
     }
 
     printf("Connection established\n");
